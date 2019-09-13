@@ -409,8 +409,8 @@ host_IP =  '185.176.0.173'
 port = 3306
 database_name = 'smartpow_world'
 corr_limit=0   
-forward_look_short=96
-forward_look_long=192
+forward_look_short=12
+forward_look_long=24
 test_window=96
 index_start_input_long=2000
 index_start_output=index_start_input_long+forward_look_long 
@@ -420,12 +420,12 @@ range_alpha=5
 start_smp_database=24000
 stop_smp_database=40000
 window_smp_database=15000
-#model_list=['neural net']
-model_list=['RF']
+model_list=['neural net']
+#model_list=['RF']
 #model_list=['regression']
 final_performance=[]
-lstm_history=96
-count=0
+lstm_history=0
+count=1
 clf=0
 no_epochs=20
 number_days=10000
@@ -433,13 +433,13 @@ time_interval_test=1800
 sample_interval=1
 N=1
 back_test_file=0
-wait_delay=1800
+wait_delay=1800 
 
  
 
 if __name__ == '__main__':
     import time
-    dt = datetime.datetime(2019, 9, 3 , 19 , 00 ) 
+    dt = datetime.datetime(2019, 9, 13 , 17   , 00 ) 
     dt=time.mktime(dt.timetuple())
 
     for i in range(0,number_days,1):
@@ -448,7 +448,8 @@ if __name__ == '__main__':
             [all_labels,df_final,labels_forecast,labels_historical_short,labels_historical_long]=createDF(user_name, passw, host_IP, database_name,dt)
  
             # create the input and output variables for modelling
-            df_final1=df_final.iloc[0:len(df_final)-back_test_file+count]
+            df_final1=df_final
+            #df_final1=df_final.iloc[0:len(df_final)-back_test_file+count]
             df_final1['DAM BAL Delta']=df_final1['smp_d_minus_1']-df_final1['smp_d_plus_4']
             [input_values_combined, output_values_range]=create_final_input_output(df_final1,model_type)
             [pred_train,pred_test,ytrain,ytest,clf]=create_model_output(model_type,input_values_combined, output_values_range,count,clf,no_epochs)        
@@ -467,7 +468,8 @@ if __name__ == '__main__':
             pred_test_reshape=np.tile(pred_test.reshape(len(pred_test), 1), (1, 2))
             pred_test_descaled = min_max_scaler.inverse_transform(pred_test_reshape)
             df_output['Predicted Delta']=pred_test_descaled[:,0]
-            df_output['Predicted Delta']=df_output['Predicted Delta'].apply(lambda x:0 if x<=0.5 else 1)
+            df_output['Model_BAL']=df_output['Predicted Delta']
+            df_output['Predicted Delta']=df_output['Predicted Delta'].apply(lambda x:0 if x<=24 else 1)
            
             ytest_reshape=np.tile(ytest.reshape(len(ytest), 1), (1, 2))
             ytest_descaled = min_max_scaler.inverse_transform(ytest_reshape)
@@ -480,10 +482,10 @@ if __name__ == '__main__':
             
             if count==0:
                 engine = create_engine('mysql+mysqldb://fergus:Uniwhite_8080@185.176.0.173:3306/smartpow_world', echo = False)
-                df_output.to_sql(name='Forecast_BAL_Dev', con=engine, if_exists = 'replace', index=False)
+                df_output.to_sql(name='Forecast_BAL_Dev_1', con=engine, if_exists = 'replace', index=False)
             if count>0:
                 engine = create_engine('mysql+mysqldb://fergus:Uniwhite_8080@185.176.0.173:3306/smartpow_world', echo = False)
-                df_output.to_sql(name='Forecast_BAL_Dev', con=engine, if_exists = 'append', index=False)
+                df_output.to_sql(name='Forecast_BAL_Dev_1', con=engine, if_exists = 'append', index=False)
             
             count=count+1
             dt=dt+time_interval_test
@@ -496,4 +498,6 @@ if __name__ == '__main__':
                 print(stop_time-start_time)
                 if stop_time-start_time>wait_delay:
                     break  
+ 
+
  
