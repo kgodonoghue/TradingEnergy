@@ -1,115 +1,45 @@
+'''IDA1 closes at 5:30 and goes from 11pm tonight to 11pm tomorrow night. 
+
+IDA2 closes at 8am  and goes from 11am to 11pm
+
+IDA3  closes at 2:30pm and goes from 5pm to 11 pm (same day).'''
+
 import pandas as pd
 import numpy as np
-import csv
 import matplotlib.pyplot as plt
-from random import randint
-import os
-from numpy import genfromtxt
-from sklearn import svm, datasets
-from sklearn.model_selection import train_test_split
 from sklearn.metrics import classification_report
-from sklearn import metrics
-from itertools import product
-from math import *
-import csv
-from sklearn import svm, datasets, preprocessing, tree
 from pandas import DataFrame, read_csv
-from sklearn.neural_network import MLPClassifier, MLPRegressor
-import glob
-import pickle
-from math import floor
-from sklearn import metrics
-import random
-import glob
 import time
-from sklearn import metrics
-import pandas as pd
 import matplotlib.pyplot as plt
 from math import *
 from random import randint
-import os
-from numpy import genfromtxt
-from sklearn.model_selection import train_test_split
-import sklearn
-import statsmodels.api as sm
-from sklearn import linear_model
 from sklearn.preprocessing import MinMaxScaler
-from sklearn.preprocessing import LabelEncoder
-from sklearn.metrics import mean_squared_error
-from keras.models import Sequential
-from keras.layers import Dense
-from keras.layers import LSTM
-from matplotlib import pyplot
-from math import sqrt
-from numpy import concatenate
-from pandas import concat
 import datetime
 import time
-from sklearn.ensemble import RandomForestRegressor
-from sklearn.datasets import make_regression
-from sklearn.metrics import confusion_matrix
 from pandas_ml import ConfusionMatrix
-from numpy import loadtxt
-from sklearn.model_selection import train_test_split
-from sklearn.metrics import accuracy_score
-from numpy import loadtxt
 from sklearn.tree import DecisionTreeRegressor
-from sklearn.svm import SVR
+from sklearn import preprocessing
+from sklearn.ensemble import RandomForestRegressor
+from sklearn.metrics import confusion_matrix
+import time
+import pymysql
+pymysql.install_as_MySQLdb()
 import mysql.connector
 from sqlalchemy import create_engine
 from pandas.io import sql
-#import MySQLdb
+import MySQLdb
 import pymysql
 pymysql.install_as_MySQLdb()
 import mysql.connector
 
-
-
-''' ML Linear Predictive Function '''
-def ML_linear(inputData, outputData):
-    clf = linear_model.LinearRegression()
-    clf = DecisionTreeRegressor(max_depth=5)
-    clf.fit(inputData,outputData)
-    predicted_value=clf.predict(inputData)
-    return predicted_value,clf
-
-''' ML NN Predictive Function '''
-def ML_NN(inputData, outputData, size, alpha_value):
-    clf = MLPRegressor(hidden_layer_sizes=(size,),  activation='relu', solver='adam',    alpha=alpha_value,batch_size='auto', learning_rate='constant', learning_rate_init=0.01, power_t=0.5, max_iter=1000, shuffle=True, random_state=None, tol=0.0001, verbose=False, warm_start=False, momentum=0.9,  nesterovs_momentum=True, early_stopping=False, validation_fraction=0.1, beta_1=0.9, beta_2=0.999,  epsilon=1e-08)
-    clf.fit(inputData,outputData)
-    predicted_value=clf.predict(inputData)
-    return predicted_value,clf
-
-''' ML SMN Predictive Function '''
-def ML_Optimizer_NN(xtrain, ytrain,xtest, ytest,range_size,range_alpha):
-    results_fit_array=[]
-    for i in range(1,range_size):
-        for j in range(1,range_alpha):
-            network_size=i*10
-            alpha_value=j/50 
-            [pred_train,clf]=ML_NN(xtrain, ytrain,network_size,alpha_value)
-            pred_test=clf.predict(xtest)
-            results_train=ytrain-pred_train
-            results_test=ytest-pred_test
-            results_fit_array.append([network_size,alpha_value,clf,sum(abs(results_train)),sum(abs(results_test))])
-            print(network_size,alpha_value,sum(abs(results_train)),sum(abs(results_test)))
-    results_fit_array=np.array(results_fit_array)
-    lowest_index=np.argmin(results_fit_array[:,3], axis=0)
-    print(results_fit_array)
-    optimal_size=results_fit_array[lowest_index,0]
-    optimal_alpha=results_fit_array[lowest_index,1]
-    clf=results_fit_array[lowest_index,2]
-    
-    return pred_train,optimal_size,optimal_alpha,clf
-
 ''' train and test split function '''
-def splitPreProcess(input_values,output_values,test_window,lstm_history):
+def splitPreProcess(input_values,output_values,test_window):
     
     xtrain=input_values[0:len(input_values)-test_window,:]
     ytrain=output_values[0:len(input_values)-test_window]
 
-    xtest=input_values[len(input_values)-test_window-lstm_history:,:]
-    ytest=output_values[len(output_values)-test_window-lstm_history:]
+    xtest=input_values[len(input_values)-test_window:,:]
+    ytest=output_values[len(output_values)-test_window:]
     
     return xtrain,xtest,ytrain,ytest
 
@@ -143,35 +73,6 @@ def create_final_input_output(df_final,model_type):
     input_values_combined=np.hstack((input_values_combined,input_values_historical_long_range))
     return input_values_combined, output_values_range
  
-def create3D(xtrain,xtest,ytrain,ytest,lstm_history):
-    
-    # create the 3D train
-    col_size_train=len(xtrain[0,:])
-    row_size_train=lstm_history
-    mat_size_train=len(xtrain)-lstm_history
-    xtrain_3D=np.zeros((mat_size_train,row_size_train,col_size_train))
-    MATindex=0
-           
-    for i in range(lstm_history,len(xtrain)): 
-            xtrain_3D[MATindex,0:row_size_train,0:col_size_train]=xtrain[i-lstm_history:i,:]
-            MATindex=MATindex+1
-    
-    ytrain_3D=ytrain[lstm_history:]
-    
-    # create the 3D test
-    col_size_test=len(xtest[0,:])
-    row_size_test=lstm_history
-    mat_size_test=len(xtest)-lstm_history
-    xtest_3D=np.zeros((mat_size_test,row_size_test,col_size_test))
-    MATindex=0
-           
-    for i in range(lstm_history,len(xtest)): 
-            xtest_3D[MATindex,0:row_size_test,0:col_size_test]=xtest[i-lstm_history:i,:]
-            MATindex=MATindex+1
-    
-    ytest_3D=ytest[lstm_history:]
-       
-    return xtrain_3D,xtest_3D,ytrain_3D,ytest_3D
 
 def createDF(user_name, passw, host_IP, database_name,dt):
     cnx = mysql.connector.connect(user=user_name, password=passw,host=host_IP, database=database_name)
@@ -265,139 +166,25 @@ def createDF(user_name, passw, host_IP, database_name,dt):
     df_final['weekday'] = pd.to_datetime(df_final['unix_date'],unit='s')
     df_final['weekday']=df_final['weekday'].dt.dayofweek
     
-    df_final['Bank Holiday']=df_final['dates_x'].isin([1012019,170319,18032019,22042019,6052019,3062019,5082019,28102019,25122019,26122019])
-    df_final['Bank Holiday']=df_final['Bank Holiday'].astype(int)
- 
-    
-    #df_final['DAM BAL Delta']=df_final['smp_d_plus_4']
-    df_final=df_final.iloc[::sample_interval, :]
-   
-    df_final=df_final.iloc[1000:index_time]
     df_final=df_final.fillna(0) 
     df_final.to_csv('final_file.csv',index=False,header=True)
     df_final = pd.read_csv('final_file.csv')
     
-    df_final=df_final.groupby(df_final.index // N).mean()
-    
     df_final['DAM BAL Delta']=df_final['smp_d_minus_1']-df_final['smp_d_plus_4']
     df_final['DAM BAL Delta']=df_final['DAM BAL Delta'].apply(lambda x:0 if x<=0 else 1)
+ 
     
-   
-    
-    labels_forecast=['smp_d_minus_1','WindForecastEirgrid','hour','TSODemandForecast','TSORenewableForecast','GBP_DAM','NetPosition','IndexVolumes']
-    
-    labels_historical_short=['smp_d_plus_4','smp_d_minus_1','sum_power','gas']
-    
-    labels_historical_long=['smp_d_plus_4','smp_d_minus_1','sum_power','gas']
-    
-    #labels_historical_long=labels_historical_long+list(power_stations_only)
-    
-    all_labels=labels_forecast+labels_historical_short+labels_historical_long
-    
-    return all_labels,df_final,labels_forecast,labels_historical_short,labels_historical_long
+def create_model_output(model_type,input_values_combined, output_values_range):
 
-def create_model_output(model_type,input_values_combined, output_values_range,count,clf,no_epochs):
-        if model_type=='regression':
-            ''' ML regression Model '''
-            [xtrain,xtest,ytrain,ytest]=splitPreProcess(input_values_combined,output_values_range,test_window,lstm_history)
-            [pred_train,clf]=ML_linear(xtrain, ytrain)
-            pred_train=clf.predict(xtrain)
-            pred_test=clf.predict(xtest[lstm_history:,:])
-            pred_train= pred_train.ravel()
-            pred_test= pred_test.ravel()
-            ytest=ytest[lstm_history:]
-        elif model_type=='neural net':
-            ''' NN regression Model '''
-            [xtrain,xtest,ytrain,ytest]=splitPreProcess(input_values_combined,output_values_range,test_window,lstm_history)
-            [pred_train,optimal_size,optimal_alpha,clf]=ML_Optimizer_NN(xtrain, ytrain,xtest, ytest,range_size,range_alpha)
-            pred_train=clf.predict(xtrain)
-            pred_test=clf.predict(xtest[lstm_history:,:])
-            pred_train= pred_train.ravel()
-            pred_test= pred_test.ravel()
-            ytest=ytest[lstm_history:]
-        elif model_type=='RF':
-            [xtrain,xtest,ytrain,ytest]=splitPreProcess(input_values_combined,output_values_range,test_window,lstm_history)
+        if model_type=='RF':
+            [xtrain,xtest,ytrain,ytest]=splitPreProcess(input_values_combined,output_values_range,test_window)
             clf = RandomForestRegressor(max_depth=5, random_state=0,n_estimators=10)
             clf.fit(xtrain, ytrain)
             print(clf.feature_importances_)
             pred_train=clf.predict(xtrain)
-            pred_test=clf.predict(xtest[lstm_history:,:])
+            pred_test=clf.predict(xtest)
             pred_train= pred_train.ravel()
             pred_test= pred_test.ravel()
-            ytest=ytest[lstm_history:]
-        elif model_type=='SVM':
-            [xtrain,xtest,ytrain,ytest]=splitPreProcess(input_values_combined,output_values_range,test_window,lstm_history)
-            clf = SVR(gamma=0.001, C=1.0, epsilon=0.2)
-            clf.fit(xtrain, ytrain)
-            pred_train=clf.predict(xtrain)
-            pred_test=clf.predict(xtest[lstm_history:,:])
-            pred_train= pred_train.ravel()
-            pred_test= pred_test.ravel()
-            ytest=ytest[lstm_history:]
-        elif model_type=='lstm':
-            ''' LSTM regression Model '''    
-            [xtrain,xtest,ytrain,ytest]=splitPreProcess(input_values_combined,output_values_range,test_window,lstm_history)
-            xtrain = xtrain.reshape((xtrain.shape[0], 1, xtrain.shape[1]))
-            xtest = xtest.reshape((xtest.shape[0], 1, xtest.shape[1]))
-            if count==0:
-                clf = Sequential()
-                clf.add(LSTM(200, input_shape=(xtrain.shape[1], xtrain.shape[2])))
-                clf.add(Dense(1))
-                clf.compile(loss='mae', optimizer='adam')
-                history = clf.fit(xtrain, ytrain, epochs=10, batch_size=5, validation_data=(xtrain, ytrain), verbose=1, shuffle=True)
-                pyplot.plot(history.history['loss'], label='train')
-                pyplot.plot(history.history['val_loss'], label='test')
-                pyplot.legend()
-                pyplot.show()
-                pred_train=clf.predict(xtrain)
-                pred_test=clf.predict(xtest[lstm_history:,:])
-                pred_train= pred_train.ravel()
-                pred_test= pred_test.ravel()
-                ytest=ytest[lstm_history:]
-                s = pickle.dumps(clf)
-            else:
-                clf = pickle.loads(s)
-                pred_train=clf.predict(xtrain)
-                pred_test=clf.predict(xtest[lstm_history:,:])
-                pred_train= pred_train.ravel()
-                pred_test= pred_test.ravel()
-                ytest=ytest[lstm_history:]
-        elif model_type=='lstm_3D':
-            ''' LSTM regression Model '''    
-            [xtrain,xtest,ytrain,ytest]=splitPreProcess(input_values_combined,output_values_range,test_window,lstm_history)
-            [xtrain_3D,xtest_3D,ytrain_3D,ytest_3D]=create3D(xtrain,xtest,ytrain,ytest,lstm_history)
-            xtrain=xtrain_3D
-            xtest=xtest_3D
-            ytrain=ytrain_3D
-            ytest=ytest_3D            
-            if (count==0) or (count>0):
-                clf = Sequential() 
-                clf.add(LSTM(200, input_shape=(xtrain.shape[1], xtrain.shape[2])))
-                clf.add(Dense(1))
-                clf.compile(loss='mae', optimizer='adam')
-                history = clf.fit(xtrain, ytrain, epochs=no_epochs, batch_size=10, validation_data=(xtrain, ytrain), verbose=1, shuffle=True)
-                pyplot.plot(history.history['loss'], label='train')
-                pyplot.plot(history.history['val_loss'], label='test')
-                pyplot.legend()
-                pyplot.show()
-                pred_train=clf.predict(xtrain)  
-                pred_test=clf.predict(xtest)
-                pred_train= pred_train.ravel()
-                pred_test= pred_test.ravel()
-                s = pickle.dumps(clf)
-            else:
-                #clf = pickle.loads(s)
-                pred_train=clf.predict(xtrain)  
-                pred_test=clf.predict(xtest)
-                pred_train= pred_train.ravel()
-                pred_test= pred_test.ravel()
-        
-        corr_coefficient_train=np.corrcoef(pred_train,ytrain)
-        corr_coefficient_test=np.corrcoef(pred_test,ytest)
-        final_performance.append([model_type,np.sum(abs(pred_test-ytest)),corr_coefficient_test[0,1],np.sum(abs(pred_train-ytrain)),corr_coefficient_train[0,1]])
-        print(final_performance)
-        df_performance=pd.DataFrame(final_performance)
-        df_performance.to_csv('df_performance.csv',index=False,header=True)
         return pred_train,pred_test,ytrain,ytest,clf
 
 
@@ -408,96 +195,94 @@ passw = 'Uniwhite_8080'
 host_IP =  '185.176.0.173'
 port = 3306
 database_name = 'smartpow_world'
-corr_limit=0   
-forward_look_short=12
-forward_look_long=24
-test_window=96
+forward_look_short=80
+forward_look_long=160
 index_start_input_long=2000
 index_start_output=index_start_input_long+forward_look_long 
 index_start_input_short=index_start_input_long+forward_look_short 
-range_size=5
-range_alpha=5
 start_smp_database=24000
 stop_smp_database=40000
 window_smp_database=15000
-model_list=['neural net']
-#model_list=['RF']
-#model_list=['regression']
-final_performance=[]
-lstm_history=0
-count=1
-clf=0
-no_epochs=20
-number_days=10000
-time_interval_test=1800
+model_list=['RF']
+number_days=1
 sample_interval=1
-N=1
 back_test_file=0
 wait_delay=1800 
-
- 
+count=1
+test_window=48
+threshold=10
+next_day_delay=86400
+next_day_delay=0
+number_days=10
+window=0
+labels_forecast=['TSORenewableForecast' ,'TSODemandForecast','smp_d_minus_1','WindForecastEirgrid','hour','GBP_DAM','NetPosition','IndexVolumes','CalculatedImbalance','NetInterconnectorSchedule','TotalPN']
+labels_historical_short=['smp_d_minus_1','sum_power','gas','smp_d_plus_4']
+labels_historical_long=['smp_d_minus_1','sum_power','gas','smp_d_plus_4']
+all_labels=labels_forecast+labels_historical_short+labels_historical_long
 
 if __name__ == '__main__':
+    
     import time
-    dt = datetime.datetime(2019, 9, 13 , 17   , 00 ) 
+    dt = datetime.datetime(2019, 9, 24 , 23 , 30 ) 
     dt=time.mktime(dt.timetuple())
 
     for i in range(0,number_days,1):
         for model_type in model_list:
+            print(model_type)
             start_time = time.time()
-            [all_labels,df_final,labels_forecast,labels_historical_short,labels_historical_long]=createDF(user_name, passw, host_IP, database_name,dt)
- 
-            # create the input and output variables for modelling
+            [df_final]=createDF(user_name, passw, host_IP, database_name,dt)
             df_final1=df_final
-            #df_final1=df_final.iloc[0:len(df_final)-back_test_file+count]
             df_final1['DAM BAL Delta']=df_final1['smp_d_minus_1']-df_final1['smp_d_plus_4']
             [input_values_combined, output_values_range]=create_final_input_output(df_final1,model_type)
-            [pred_train,pred_test,ytrain,ytest,clf]=create_model_output(model_type,input_values_combined, output_values_range,count,clf,no_epochs)        
-            
+            [pred_train,pred_test,ytrain,ytest,clf]=create_model_output(model_type,input_values_combined, output_values_range)        
+       
             data = pd.DataFrame()
             df_output = pd.DataFrame(data, columns = ['unix_date','Date', 'Hour', 'hour_interval', 'Model_BAL','Actual_BAL']) 
             df_output['Date']=df_final1['dates_x'].iloc[len(df_final1)-test_window:]
             df_output['Hour']=df_final1['hour'].iloc[len(df_final1)-test_window:]
             df_output['hour_interval']=df_final1['hour_interval'].iloc[len(df_final1)-test_window:]
             df_output['unix_date']=df_final1['unix_date'].iloc[len(df_final1)-test_window:]
-           
             min_max_scaler = preprocessing.MinMaxScaler()
             output_values=df_final1[['DAM BAL Delta','smp_d_minus_1']]
             output_values = min_max_scaler.fit_transform(output_values)
             output_values_descaled = min_max_scaler.inverse_transform(output_values)
             pred_test_reshape=np.tile(pred_test.reshape(len(pred_test), 1), (1, 2))
             pred_test_descaled = min_max_scaler.inverse_transform(pred_test_reshape)
-            df_output['Predicted Delta']=pred_test_descaled[:,0]
-            df_output['Model_BAL']=df_output['Predicted Delta']
-            df_output['Predicted Delta']=df_output['Predicted Delta'].apply(lambda x:0 if x<=24 else 1)
-           
-            ytest_reshape=np.tile(ytest.reshape(len(ytest), 1), (1, 2))
-            ytest_descaled = min_max_scaler.inverse_transform(ytest_reshape)
+            df_output['Predicted_Delta']=pred_test_descaled[:,0]
+            df_output['Model_BAL']=df_output['Predicted_Delta']
+            df_output['Predicted_Delta']=df_output['Predicted_Delta'].apply(lambda x:0 if x<=threshold else 1)           
             df_output['Actual_BAL']=df_final1['smp_d_plus_4'].iloc[len(df_final1)-test_window:]
             df_output['Actual_DAM']=df_final1['smp_d_minus_1'].iloc[len(df_final1)-test_window:]
             df_output['Actual_Delta']=df_final1['DAM BAL Delta'].iloc[len(df_final1)-test_window:]
             df_output['Actual_Delta_Binary']=df_output['Actual_Delta'].apply(lambda x:0 if x<=0 else 1)
-            df_output =df_output.drop(df_output.index[0:-1])
-            df_output.to_csv('df_output.csv',index=False,header=True)
+            df_DAM_prediction=df_output[df_output['Predicted_Delta']==1] 
+            df_DAM_prediction['Actual_Delta'].cumsum().plot()
             
             if count==0:
                 engine = create_engine('mysql+mysqldb://fergus:Uniwhite_8080@185.176.0.173:3306/smartpow_world', echo = False)
-                df_output.to_sql(name='Forecast_BAL_Dev_1', con=engine, if_exists = 'replace', index=False)
+                df_output.to_sql(name='Forecast_BAL_Dev_IDA1', con=engine, if_exists = 'replace', index=False)
             if count>0:
                 engine = create_engine('mysql+mysqldb://fergus:Uniwhite_8080@185.176.0.173:3306/smartpow_world', echo = False)
-                df_output.to_sql(name='Forecast_BAL_Dev_1', con=engine, if_exists = 'append', index=False)
+                df_output.to_sql(name='Forecast_BAL_Dev_IDA1', con=engine, if_exists = 'append', index=False)
             
-            count=count+1
-            dt=dt+time_interval_test
-            
-            count=count+1
+            dt=dt+next_day_delay
             
             for j in range(0,10000000):
                 time.sleep(5)
                 stop_time = time.time()
                 print(stop_time-start_time)
-                if stop_time-start_time>wait_delay:
-                    break  
- 
+                if stop_time-start_time>next_day_delay:
+                    break 
+                
+            count=count+1
+            
+            if model_type=='RF':
+                df_feature = pd.DataFrame(columns=['Feature', 'Importance Weight'])
+                df_feature['Importance Weight']=clf.feature_importances_
+                df_feature['Feature']=all_labels
+                df_feature=df_feature.sort_values(by='Importance Weight', ascending=False)
+                df_feature.to_csv('feature_list_DAM.csv',index=False,header=True) 
+
+            
 
  
