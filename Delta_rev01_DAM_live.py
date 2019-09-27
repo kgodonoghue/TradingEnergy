@@ -21,9 +21,7 @@ from sklearn.tree import DecisionTreeRegressor
 from sklearn import preprocessing
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.metrics import confusion_matrix
-import time
-import pymysql
-pymysql.install_as_MySQLdb()
+
 import mysql.connector
 from sqlalchemy import create_engine
 from pandas.io import sql
@@ -88,35 +86,6 @@ def createDF(user_name, passw, host_IP, database_name,dt):
     df_smp['dates'] = df_smp['dates'].str.replace("/", "")
     df_smp['merge_variable'] = df_smp['dates'].astype(str) + df_smp['hour'].astype(str)    
     
-    #trip table
-    df_trip=pd.read_sql('SELECT * FROM pub_d_dispatchinstructions where INSTRUCTION_CODE = "TRIP"', cnx)
-    df_trip=df_trip[['INSTRUCTION_TIMESTAMP','INSTRUCTION_ISSUE_TIME','INSTRUCTION_CODE','RESOURCE_NAME']]
-    df_trip['year']=df_trip['INSTRUCTION_ISSUE_TIME'].astype(str).str[0:4]
-    df_trip['month']=df_trip['INSTRUCTION_ISSUE_TIME'].astype(str).str[5:7]
-    df_trip['day']=df_trip['INSTRUCTION_ISSUE_TIME'].astype(str).str[8:10]
-    df_trip['hour']=df_trip['INSTRUCTION_ISSUE_TIME'].astype(str).str[11:13]
-    df_trip['RESOURCE_NAME']=df_trip['RESOURCE_NAME'].astype(str).str[3:9]
-    df_trip['RESOURCE_NAME']=df_trip['RESOURCE_NAME'].astype(int)
-    df_trip['merge_variable'] = df_trip['day'].astype(str) + df_trip['month'].astype(str) + df_trip['year'].astype(str) + df_trip['hour'].astype(str) 
-  
-    df_smp = df_smp.merge(df_trip,  how='left', on=['merge_variable'])
-    #df_smp = df_smp.drop(columns=['year','month','day','hour_y'])
-    df_smp = df_smp.drop(columns=['hour_y'])
-    
-    df_smp['INSTRUCTION_CODE']= df_smp['INSTRUCTION_CODE'].str.replace("TRIP", "1")
-    df_smp['INSTRUCTION_CODE']=df_smp['INSTRUCTION_CODE'].fillna(0)
-    df_smp['INSTRUCTION_CODE']=df_smp['INSTRUCTION_CODE'].astype(int)
-    
-    df_smp.rename(columns={'hour_x': 'hour', 'oldName2': 'newName2'}, inplace=True)
-    
-    for i in range(0,len(df_smp)-10):
-        if df_smp['INSTRUCTION_CODE'].iloc[i]==1:
-            #df_merged['INSTRUCTION_CODE'].iloc[i:i+4]=2
-            df_smp['INSTRUCTION_CODE'].iloc[i:i+4]=2
-        else:
-            x=0 
-    
-    df_smp=df_smp.drop_duplicates('unix_date')
      
     #fuel table
     df_fuel=pd.read_sql('SELECT * FROM eirgrid_fuelmix', cnx)
@@ -155,7 +124,7 @@ def createDF(user_name, passw, host_IP, database_name,dt):
     df_final['month']=df_final['month'].astype(int)
     df_final['year']=df_final['dates_x'].astype(str).str[4:8]
     df_final['year']=df_final['year'].astype(int)
-    df_final['hour']= df_final['hour'].str.replace("24", "00")
+    #df_final['hour']= df_final['hour'].str.replace("24", "00")
     df_final['hour']=df_final['hour'].astype(int)
     df_final['time_stamp']=1
 
@@ -166,21 +135,40 @@ def createDF(user_name, passw, host_IP, database_name,dt):
     df_final['weekday'] = pd.to_datetime(df_final['unix_date'],unit='s')
     df_final['weekday']=df_final['weekday'].dt.dayofweek
     
+    df_final['Bank Holiday']=df_final['dates_x'].isin([1012019,170319,18032019,22042019,6052019,3062019,5082019,28102019,25122019,26122019])
+    df_final['Bank Holiday']=df_final['Bank Holiday'].astype(int)
+ 
+    
+    #df_final['DAM BAL Delta']=df_final['smp_d_plus_4']
+    df_final=df_final.iloc[::sample_interval, :]
+   
+    df_final=df_final.iloc[1000:index_time]
     df_final=df_final.fillna(0) 
     df_final.to_csv('final_file.csv',index=False,header=True)
     df_final = pd.read_csv('final_file.csv')
     
+    #df_final=df_final.groupby(df_final.index // N).mean()
+    
     df_final['DAM BAL Delta']=df_final['smp_d_minus_1']-df_final['smp_d_plus_4']
     df_final['DAM BAL Delta']=df_final['DAM BAL Delta'].apply(lambda x:0 if x<=0 else 1)
- 
+   
+    labels_forecast=['TSORenewableForecast' ,'TSODemandForecast','smp_d_minus_1','WindForecastEirgrid','hour','GBP_DAM','NetPosition','IndexVolumes','CalculatedImbalance','NetInterconnectorSchedule','TotalPN','weekday']
+    labels_historical_short=['smp_d_minus_1','sum_power','gas','smp_d_plus_4', 'MIX_COAL', 'MIX_GAS', 'MIX_NET_IMPORT', 'MIX_OTHER_FOSSIL', 'MIX_RENEW', 'MIX_TOTAL', 'FUEL_COAL', 'FUEL_GAS', 'FUEL_NET_IMPORT', 'FUEL_OTHER_FOSSIL', 'FUEL_RENEW', 'temperature_value', 'pressure_value', 'humidity']
+    labels_historical_long=['smp_d_minus_1','sum_power','gas','smp_d_plus_4']
+    labels_historical_short=labels_historical_short+list(power_stations_only)
+    
+    all_labels=labels_forecast+labels_historical_short+labels_historical_long
+    
+    return all_labels,df_final,labels_forecast,labels_historical_short,labels_historical_long
+
     
 def create_model_output(model_type,input_values_combined, output_values_range):
 
         if model_type=='RF':
             [xtrain,xtest,ytrain,ytest]=splitPreProcess(input_values_combined,output_values_range,test_window)
-            clf = RandomForestRegressor(max_depth=5, random_state=0,n_estimators=10)
+            clf = RandomForestRegressor(max_depth=4, random_state=0,n_estimators=5)
             clf.fit(xtrain, ytrain)
-            print(clf.feature_importances_)
+            #print(clf.feature_importances_)
             pred_train=clf.predict(xtrain)
             pred_test=clf.predict(xtest)
             pred_train= pred_train.ravel()
@@ -195,42 +183,35 @@ passw = 'Uniwhite_8080'
 host_IP =  '185.176.0.173'
 port = 3306
 database_name = 'smartpow_world'
-forward_look_short=80
-forward_look_long=160
-index_start_input_long=2000
+forward_look_short=100
+forward_look_long=200
+index_start_input_long=1000
 index_start_output=index_start_input_long+forward_look_long 
 index_start_input_short=index_start_input_long+forward_look_short 
 start_smp_database=24000
 stop_smp_database=40000
 window_smp_database=15000
 model_list=['RF']
-number_days=1
+number_days=10
 sample_interval=1
 back_test_file=0
 wait_delay=1800 
 count=1
-test_window=48
+test_window=96
 threshold=10
 next_day_delay=86400
-next_day_delay=0
-number_days=10
-window=0
-labels_forecast=['TSORenewableForecast' ,'TSODemandForecast','smp_d_minus_1','WindForecastEirgrid','hour','GBP_DAM','NetPosition','IndexVolumes','CalculatedImbalance','NetInterconnectorSchedule','TotalPN']
-labels_historical_short=['smp_d_minus_1','sum_power','gas','smp_d_plus_4']
-labels_historical_long=['smp_d_minus_1','sum_power','gas','smp_d_plus_4']
-all_labels=labels_forecast+labels_historical_short+labels_historical_long
 
 if __name__ == '__main__':
     
     import time
-    dt = datetime.datetime(2019, 9, 24 , 23 , 30 ) 
+    dt = datetime.datetime(2019, 9, 28 , 23 , 30 ) 
     dt=time.mktime(dt.timetuple())
 
     for i in range(0,number_days,1):
         for model_type in model_list:
             print(model_type)
             start_time = time.time()
-            [df_final]=createDF(user_name, passw, host_IP, database_name,dt)
+            [all_labels,df_final,labels_forecast,labels_historical_short,labels_historical_long]=createDF(user_name, passw, host_IP, database_name,dt)
             df_final1=df_final
             df_final1['DAM BAL Delta']=df_final1['smp_d_minus_1']-df_final1['smp_d_plus_4']
             [input_values_combined, output_values_range]=create_final_input_output(df_final1,model_type)
@@ -257,7 +238,18 @@ if __name__ == '__main__':
             df_output['Actual_Delta_Binary']=df_output['Actual_Delta'].apply(lambda x:0 if x<=0 else 1)
             df_DAM_prediction=df_output[df_output['Predicted_Delta']==1] 
             df_DAM_prediction['Actual_Delta'].cumsum().plot()
+            df_output['WindForecastEirgrid']=df_final1['WindForecastEirgrid'].iloc[len(df_final1)-test_window:]
+            sum_power=df_final1['sum_power'].iloc[len(df_final1)-test_window-forward_look_short:-forward_look_short]
+            sum_power=np.array(sum_power)
+            df_output['sum_power']=sum_power
+            df_output['Date'] = df_output['Date'].astype(str)   
+            df_output['Date'] = df_output['Date'].str[0:2]+'/'+df_output['Date'].str[2:4]+'/'+df_output['Date'].str[4:8]
+            df_output =df_output.drop(df_output.index[0:-48])
+            df_output.to_csv('df_output.csv',index=False,header=True)
+
             
+            #df_DAM_prediction['Actual_Delta'].cumsum().plot()
+
             if count==0:
                 engine = create_engine('mysql+mysqldb://fergus:Uniwhite_8080@185.176.0.173:3306/smartpow_world', echo = False)
                 df_output.to_sql(name='Forecast_BAL_Dev_IDA1', con=engine, if_exists = 'replace', index=False)
@@ -282,7 +274,7 @@ if __name__ == '__main__':
                 df_feature['Feature']=all_labels
                 df_feature=df_feature.sort_values(by='Importance Weight', ascending=False)
                 df_feature.to_csv('feature_list_DAM.csv',index=False,header=True) 
+ 
 
             
-
- 
+            
