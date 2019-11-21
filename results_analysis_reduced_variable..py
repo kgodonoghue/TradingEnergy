@@ -185,49 +185,39 @@ passw = 'Uniwhite_8080'
 host_IP =  '185.176.0.173'
 port = 3306
 database_name = 'smartpow_world'
-forward_look_short=100
-forward_look_long=200
-index_start_input_long=1000
-index_start_output=index_start_input_long+forward_look_long 
-index_start_input_short=index_start_input_long+forward_look_short  
-start_smp_database=24000
-stop_smp_database=40000
-window_smp_database=15000
-model_list=['RF']
-number_days=1
-sample_interval=1
-back_test_file=0
-wait_delay=1800 
-count=1
-test_window=3000
-threshold=-10
-next_day_delay=86400
 move_avg_value=400
 result_type='IDA1'
 result_type='DAM'
 model='Model_reduced_variable_'
 month_start=10
-day_start=2
+day_start=1
 month_end=11
-day_end=3
+day_end=21
 date=str(day_start)+"_"+str(month_start)+"_"+str(day_end)+"_"+str(month_end)
 x_spacing=20
+move_avg_value=20
+DAM_threshold=10
+BAL_threshold=-5
 
 if __name__ == '__main__':
     
     #time and connection
     dt = datetime.datetime(2019, month_start, day_start , 0 , 00 ) 
     dt=time.mktime(dt.timetuple())
-    dt_stop = datetime.datetime(2019, month_end, day_end , 19 , 00 ) 
+    dt_stop = datetime.datetime(2019, month_end, day_end , 17 , 00 ) 
     dt_stop = time.mktime(dt_stop.timetuple())    
     cnx = mysql.connector.connect(user=user_name, password=passw,host=host_IP, database=database_name)
     
     #results table
-    df_results = pd.read_sql('SELECT * FROM Forecast_BAL_Dev_IDA2', cnx)
+    df_results = pd.read_sql('SELECT * FROM Forecast_BAL_Dev_IDA1', cnx)
     df_results['unix_date']=df_results['unix_date'].astype(int)
     df_results=df_results[df_results['unix_date']>dt]
     df_results=df_results[df_results['unix_date']<dt_stop]
     df_results['Actual_BAL']=df_results['Actual_BAL'].astype(int)
+    df_results['Model_BAL']=df_results['Model_BAL'].rolling(move_avg_value).mean()
+    df_results['Model_BAL']=df_results['Model_BAL']
+    
+    #df_results=df_results[df_results['IDA1']<1000]
     
     #select which result type IDA 1 or DAM
     if result_type=='DAM':
@@ -237,56 +227,38 @@ if __name__ == '__main__':
     
     #optional moving average option
     df_results['Delta_mov']=df_results['Delta'].rolling(move_avg_value).mean()
-    df_results_filter=df_results[df_results['Predicted_Delta']==1]
-    df_results['Date']=df_results['Date'].astype(str)
-        
-    #plot and save the results
-    '''fig, ax = plt.subplots(figsize=(20,15))
-    ax.grid(linestyle='-', linewidth='0.5', color='grey')
-    plt.xticks(rotation = 90)
-    plt.rc('xtick', labelsize=20) 
-    plt.rc('ytick', labelsize=20)
-    ax.xaxis.set_major_locator(ticker.MultipleLocator(x_spacing))
-    plt.xticks(rotation = 90)
-    plt.plot(df_results_filter['Delta'].cumsum(),'r-.',label='Profit Curve Algo__mean_profit_per_trade__' + str(df_results_filter['Delta'].mean()) + '_no_trades_' + str(len(df_results_filter['Delta'])))
-    plt.plot(df_results['Delta'].cumsum(),'b-.',label='Profit Curve 24HR__mean_profit_per_trade__'+ str(df_results['Delta'].mean())  + '_no_trades_' +  str(len(df_results['Delta'])))
-    plt.legend(loc='upper left', prop={'size': 20})    
-    fig.suptitle('Cumulative Profit Curve', fontsize=25)
-    plt.ylabel('Profit Delta Sum', fontsize=25) 
-    plt.xlabel('No 30 minute samples', fontsize=25) 
-    fig.savefig(model + date + 'profit_curve_since.jpg')'''
+    df_results_filter_DAM=df_results[df_results['Model_BAL']>DAM_threshold]
+    df_results_filter_BAL=df_results[df_results['Model_BAL']<BAL_threshold]
     
+    #df_results_filter_DAM=df_results[df_results['Normal_Trade']==1]
+    #df_results_filter_BAL=df_results[df_results['Reverse_Trade']==1]
+    
+    df_results_filter_BAL['Delta']=-1*df_results_filter_BAL['Delta']
+    df_results_filter_BALDAM=df_results_filter_DAM.append(df_results_filter_BAL)  
+    df_results_filter_BALDAM=df_results_filter_BALDAM.sort_values(by='unix_date', ascending=True)
     
     fig, ax = plt.subplots(figsize=(20,15))
     ax.grid(linestyle='-', linewidth='0.5', color='grey')
-    plt.xticks(rotation = 90)
-    plt.rc('xtick', labelsize=20) 
-    plt.rc('ytick', labelsize=20)
-    ax.xaxis.set_major_locator(ticker.MultipleLocator(x_spacing))
-    plt.xticks(rotation = 90)
-    plt.plot(df_results['Delta_mov'],'r-.',label='movavg delta_'+str(move_avg_value))
-    plt.legend(loc='upper left', prop={'size': 20})    
-    fig.suptitle('DAM minus BAl rolling moving average difference', fontsize=25)
-    plt.ylabel('DAM minus BAl difference', fontsize=25)
-    plt.xlabel('No 30 minute samples', fontsize=25) 
-    fig.savefig(model + date + 'mov_avg_curve.jpg')
-    
-    fig, ax = plt.subplots(figsize=(20,15))
-    ax.grid(linestyle='-', linewidth='0.5', color='grey')
-    ax.xaxis.set_major_locator(ticker.MultipleLocator(1))
+    ax.xaxis.set_major_locator(ticker.MultipleLocator(2))
     plt.xticks(rotation = 90)
     plt.rc('xtick', labelsize=20) 
     plt.rc('ytick', labelsize=20)
     df_results['Date']=df_results['Date'].astype(str)
     df_results['Date']= df_results['Date'].str.replace("/", "")
-    df_results_filter['Date']=df_results_filter['Date'].astype(str)
-    df_results_filter['Date']= df_results_filter['Date'].str.replace("/", "")
+    df_results_filter_DAM['Date']=df_results_filter_DAM['Date'].astype(str)
+    df_results_filter_DAM['Date']= df_results_filter_DAM['Date'].str.replace("/", "")
+    df_results_filter_BAL['Date']=df_results_filter_BAL['Date'].astype(str)
+    df_results_filter_BAL['Date']= df_results_filter_BAL['Date'].str.replace("/", "")
+    df_results_filter_BALDAM['Date']=df_results_filter_BALDAM['Date'].astype(str)
+    df_results_filter_BALDAM['Date']= df_results_filter_BALDAM['Date'].str.replace("/", "")
     plt.xticks(rotation=90)
     plt.plot(df_results['Date'],df_results['Delta'].cumsum(),'b-.',label='Profit Curve 24HR__mean_profit_per_trade__'+ str(df_results['Delta'].mean())  + '_no_trades_' +  str(len(df_results['Delta'])))
-    plt.plot(df_results_filter['Date'],df_results_filter['Delta'].cumsum(),'r-.',label='Profit Curve Algo__mean_profit_per_trade__' + str(df_results_filter['Delta'].mean()) + '_no_trades_' + str(len(df_results_filter['Delta'])))
-    plt.legend(loc='upper left', prop={'size': 20})    
-    fig.suptitle('DAM minus BAL cumulative difference over time', fontsize=25)
-    plt.ylabel('DAM minus BAL Cumulative Delta (30 minute intervals)', fontsize=25)
+    plt.plot(df_results_filter_DAM['Date'],df_results_filter_DAM['Delta'].cumsum(),'r-.',label='Profit Curve Reduced Algo DAM>BAL__mean_profit_per_trade__' + str(df_results_filter_DAM['Delta'].mean()) + '_no_trades_' + str(len(df_results_filter_DAM['Delta'])))
+    plt.plot(df_results_filter_BAL['Date'],(df_results_filter_BAL['Delta']).cumsum(),'g-.',label='Profit Curve Reduced Algo BAL>DAM__mean_profit_per_trade__' + str( df_results_filter_BAL['Delta'].mean()) + '_no_trades_' + str(len(df_results_filter_BAL['Delta'])))
+    plt.plot(df_results_filter_BALDAM['Date'],(df_results_filter_BALDAM['Delta']).cumsum(),'p-.',label='Profit Curve Reduced Algo Combined__mean_profit_per_trade__' + str(df_results_filter_BALDAM['Delta'].mean()) + '_no_trades_' + str(len(df_results_filter_BALDAM['Delta'])))
+    plt.legend(loc='lower left', prop={'size': 15})    
+    fig.suptitle('Strategy cumulative difference over time', fontsize=25)
+    plt.ylabel('DAM BAL Delta Cumulative Delta (30 minute intervals)', fontsize=25)
     plt.xlabel('Date asscoiated with 30 minute samples', fontsize=25) 
     fig.savefig(model + 'profit_curve.jpg')
 
